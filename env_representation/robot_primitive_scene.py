@@ -11,6 +11,36 @@ cylinder_params = []
 cuboid_params = []
 plane_params = []  # For planes
 
+
+# Function to perform IK and return residue
+def calculate_inverse_kinematics(robot_id, end_effector_link_index, target_pos, target_ori=None, threshold=0.01, max_iters=100):
+    # If orientation is not provided, use the current orientation
+    if target_ori is None:
+        link_state = p.getLinkState(robot_id, end_effector_link_index)
+        target_ori = link_state[1]  # Extract current orientation (quaternion)
+
+    # Calculate IK solution (joint positions)
+    joint_angles = p.calculateInverseKinematics(robot_id, end_effector_link_index, target_pos, target_ori)
+
+    # Set the robot joints to the computed IK solution
+    for i in range(num_joints):
+        p.setJointMotorControl2(robot_id, i, p.POSITION_CONTROL, joint_angles[i])
+
+    # Step the simulation to update the robot's configuration
+    p.stepSimulation()
+
+    # Get the actual end effector position after applying IK
+    actual_state = p.getLinkState(robot_id, end_effector_link_index)
+    actual_pos = actual_state[4]  # Position of the end effector
+
+    # Calculate residue (distance between target and actual positions)
+    residue = np.linalg.norm(np.array(target_pos) - np.array(actual_pos))
+
+    # Check if the solution is valid (residue below threshold)
+    solution_found = residue <= threshold
+
+    return joint_angles, residue, solution_found
+
 # Generate a random pose with position and orientation
 def random_pose(x_range=[-0.8, 0.8], y_range=[-0.8, 0.8], z_range=[0.0, 1.8]):
     position = [
